@@ -45,7 +45,7 @@ pipeline {
                           -Dsonar.projectVersion=${APP_VERSION} \
                           -Dsonar.sources=src \
                           -Dsonar.java.binaries=target \
-                          -Dsonar.host.url=http://54.145.245.39:9000
+                          -Dsonar.host.url=http://44.204.248.233:9000
                     '''
                 }
                 echo ":white_check_mark: SonarQube scan triggered successfully."
