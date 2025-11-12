@@ -21,7 +21,7 @@ pipeline {
         // ==========================
         SCANNER_HOME = tool 'sonar'
         SONARQUBE_ENV = 'sonar'
-        SONAR_CREDENTIAL_ID = 'sonar-token'   // <-- Add this in Jenkins Credentials (Secret Text)
+        SONAR_CREDENTIAL_ID = 'sonar'   // <-- Add this in Jenkins Credentials (Secret Text)
 
         // ==========================
         // 🌱 Git Configuration
