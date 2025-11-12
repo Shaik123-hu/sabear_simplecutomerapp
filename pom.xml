@@ -7,8 +7,6 @@
    <groupId>com.javatpoint</groupId>
    <artifactId>SimpleCustomerApp</artifactId>
    <packaging>war</packaging>
-
-   <!-- ✅ Fixed version -->
    <version>3.0-SNAPSHOT</version>
 
    <name>SimpleCustomerApp</name>
