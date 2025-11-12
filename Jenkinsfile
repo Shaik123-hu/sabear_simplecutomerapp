@@ -1,15 +1,15 @@
 pipeline {
     agent any
     tools {
-        maven "MVN_HOME"
+        maven "maven"
     }
     environment {
         // Nexus settings
         NEXUS_VERSION = "nexus3"
         NEXUS_PROTOCOL = "http"
-        NEXUS_URL = "44.206.236.146:8081/"
-        NEXUS_REPOSITORY = "SimpleCustomerApp"
-        NEXUS_CREDENTIAL_ID = "nexus_keygen"
+        NEXUS_URL = "3.92.251.66:8081/"
+        NEXUS_REPOSITORY = "nexus"
+        NEXUS_CREDENTIAL_ID = "nexus"
 
         // SonarQube
         SCANNER_HOME = tool 'sonar_scanner'
