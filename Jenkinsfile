@@ -58,7 +58,7 @@ pipeline {
             steps {
                 echo ":mag: Starting SonarQube Code Analysis..."
                 withSonarQubeEnv("${SONARQUBE_ENV}") {
-                    withCredentials([string(credentialsId: "${SONAR_CREDENTIAL_ID}", variable: 'SONAR_TOKEN')]) {
+                    withCredentials([string(credentialsId: "${SONAR_CREDENTIAL_ID}")]) {
                         sh """
                             ${SCANNER_HOME}/bin/sonar-scanner \
                               -Dsonar.projectKey=Ncodeit \
