@@ -12,7 +12,7 @@ pipeline {
         NEXUS_CREDENTIAL_ID = "nexus"
 
         // SonarQube
-        SCANNER_HOME = tool 'sonar_scanner'
+        SCANNER_HOME = tool 'sonar'
     }
 
     stages {
