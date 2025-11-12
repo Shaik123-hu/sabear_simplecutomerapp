@@ -1,124 +1,124 @@
 pipeline {
     agent any
     tools {
-        maven "maven"
+        // Must match names from "Manage Jenkins → Global Tool Configuration"
+        maven 'maven'
     }
     environment {
-        // Nexus settings
-        NEXUS_VERSION = "nexus3"
-        NEXUS_PROTOCOL = "http"
-        NEXUS_URL = "3.92.251.66:8081/"
-        NEXUS_REPOSITORY = "nexus"
-        NEXUS_CREDENTIAL_ID = "nexus"
-
-        // SonarQube
+        // Nexus configuration
+        NEXUS_VERSION = 'nexus3'
+        NEXUS_PROTOCOL = 'http'
+        NEXUS_URL = '3.92.251.66:8081'
+        NEXUS_REPOSITORY = 'nexus'
+        NEXUS_CREDENTIAL_ID = 'nexus'
+        // SonarQube configuration
         SCANNER_HOME = tool 'sonar'
+        SONARQUBE_ENV = 'sonar'
+        // Git repository
+        GIT_URL = 'https://github.com/Shaik123-hu/sabear_simplecutomerapp.git'
+        GIT_BRANCH = 'feature-1.1'
+        // Application info
+        APP_VERSION = '3.0'
+        APP_NAME = 'SimpleCustomerApp'
     }
-
     stages {
-        stage("clone code") {
+        stage('Clone Code') {
             steps {
-                git 'https://github.com/Shaik123-hu/sabear_simplecutomerapp.git'
+                git branch: "${GIT_BRANCH}", url: "${GIT_URL}"
+                echo ":white_check_mark: Repository cloned from ${GIT_BRANCH}"
             }
         }
-
-        stage("mvn build") {
+        stage('Maven Build') {
             steps {
+                echo ":building_construction: Running Maven Build..."
                 sh 'mvn -Dmaven.test.failure.ignore=true clean install'
             }
         }
-
-        stage("SonarCloud") {
+        stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('sonarqube_server') {
+                echo ":mag: Starting SonarQube Code Analysis..."
+                withSonarQubeEnv("${SONARQUBE_ENV}") {
                     sh '''
-                        $SCANNER_HOME/bin/sonar-scanner \
-                        -Dsonar.projectKey=Ncodeit \
-                        -Dsonar.projectName=Ncodeit \
-                        -Dsonar.projectVersion=2.0 \
-                        -Dsonar.sources=$WORKSPACE/src/ \
-                        -Dsonar.binaries=target/classes/com/visualpathit/account/controller/ \
-                        -Dsonar.junit.reportsPath=target/surefire-reports \
-                        -Dsonar.java.binaries=src/com/room/sample
+                        ${SCANNER_HOME}/bin/sonar-scanner \
+                          -Dsonar.projectKey=Ncodeit \
+                          -Dsonar.projectName=Ncodeit \
+                          -Dsonar.projectVersion=${APP_VERSION} \
+                          -Dsonar.sources=src \
+                          -Dsonar.java.binaries=target \
+                          -Dsonar.host.url=http://54.145.245.39:9000
                     '''
                 }
+                echo ":white_check_mark: SonarQube scan triggered successfully."
             }
         }
-
-        stage("publish to nexus") {
+        stage('Publish to Nexus') {
             steps {
-                script {
-                    def pom = readMavenPom file: "pom.xml"
-
-                    def groupId    = pom.groupId
-                    def artifactId = pom.artifactId
-                    def version    = pom.version
-                    def packaging  = pom.packaging
-
-                    def filesByGlob = findFiles(glob: "target/*.${packaging}")
-                    if (filesByGlob.length == 0) {
-                        error "*** No artifact found in target/*.${packaging}"
-                    }
-
-                    def artifactPath = filesByGlob[0].path
-                    if (fileExists(artifactPath)) {
-                        echo "*** Uploading ${artifactPath} to Nexus (group: ${groupId}, version: ${version}, packaging: ${packaging})"
-
-                        nexusArtifactUploader(
-                            nexusVersion: NEXUS_VERSION,
-                            protocol: NEXUS_PROTOCOL,
-                            nexusUrl: NEXUS_URL,
-                            groupId: groupId,
-                            version: version,
-                            repository: NEXUS_REPOSITORY,
-                            credentialsId: NEXUS_CREDENTIAL_ID,
-                            artifacts: [
-                                [artifactId: artifactId, classifier: '', file: artifactPath, type: packaging],
-                                [artifactId: artifactId, classifier: '', file: "pom.xml", type: "pom"]
-                            ]
-                        )
-                    } else {
-                        error "*** File: ${artifactPath}, could not be found"
-                    }
+                echo ":package: Uploading artifact to Nexus..."
+                withCredentials([usernamePassword(credentialsId: "${NEXUS_CREDENTIAL_ID}", usernameVariable: 'NX_USER', passwordVariable: 'NX_PASS')]) {
+                    sh '''
+                        ARTIFACT=$(ls target/*.war | head -n 1)
+                        echo "Found artifact: $ARTIFACT"
+                        mvn deploy:deploy-file \
+                          -DgroupId=com.javatpoint \
+                          -DartifactId=${APP_NAME} \
+                          -Dversion=${APP_VERSION} \
+                          -Dpackaging=war \
+                          -Dfile=$ARTIFACT \
+                          -DrepositoryId=${NEXUS_CREDENTIAL_ID} \
+                          -Durl=${NEXUS_PROTOCOL}://${NEXUS_URL}/repository/${NEXUS_REPOSITORY} \
+                          -DgeneratePom=true \
+                          -Dusername=$NX_USER \
+                          -Dpassword=$NX_PASS
+                    '''
                 }
+                echo ":white_check_mark: Artifact successfully published to Nexus"
             }
         }
-
-        stage("Deploy to Tomcat") {
+        stage('Deploy to Tomcat') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'tomcat', usernameVariable: 'TOMCAT_USER', passwordVariable: 'TOMCAT_PASS')]) {
-                    script {
-                        // Find the WAR file built by Maven
-                        def warFile = sh(script: "ls target/*.war | head -n 1", returnStdout: true).trim()
-                        echo "Deploying ${warFile} to Tomcat at context path /SimpleCustomerApp..."
-                        sh """
-                            curl -u $TOMCAT_USER:$TOMCAT_PASS \
-                                 -T ${warFile} \
-                                 "http://52.23.219.234:8080/manager/text/deploy?path=/SimpleCustomerApp&update=true"
-                        """
+                echo ":rocket: Deploying WAR file to Tomcat..."
+                sh '''
+                    WAR_FILE=$(ls target/*.war | head -n 1)
+                    echo "Deploying $WAR_FILE to Tomcat..."
+                    # If your Tomcat manager requires login, use: curl -u tomcat:tomcat ...
+                    # If authentication is disabled (test setup), just use plain curl:
+                    curl -T $WAR_FILE \
+                         "http://54.145.245.39:8080/manager/text/deploy?path=/simplecustomerapp&update=true"
+                '''
+                echo ":white_check_mark: Deployment to Tomcat successful!"
+            }
+        }
+        stage('Slack Notification') {
+            steps {
+                echo ":speech_balloon: Slack Notification Stage"
+                script {
+                    try {
+                        slackSend(
+                            channel: '#jenkins-integration',
+                            color: '#36A64F',
+                            message: ":white_check_mark: *${APP_NAME}* successfully built and deployed! \nJob: ${env.JOB_NAME} #${env.BUILD_NUMBER}"
+                        )
+                    } catch (err) {
+                        echo ":warning: Slack plugin not installed or misconfigured: ${err.message}"
                     }
                 }
             }
         }
     }
-
-    // ✅ Post-build Slack Notifications
     post {
-        success {
-            slackSend(
-                channel: "#jenkins-integration",
-                color: "good",
-                message: "Declarative pipeline for Simple Customer App has been successfully deployed in Tomcat :white_check_mark: by Yunus for Job:: ${env.JOB_NAME} [${env.BUILD_NUMBER}]",
-                tokenCredentialId: "Slackid"
-            )
-        }
         failure {
-            slackSend(
-                channel: "#jenkins-integration",
-                color: "danger",
-                message: "❌ Build/Deploy Failed: ${env.JOB_NAME} [${env.BUILD_NUMBER}]",
-                tokenCredentialId: "Slackid"
-            )
+            script {
+                echo ":x: Build failed for Job: ${env.JOB_NAME} #${env.BUILD_NUMBER}"
+                try {
+                    slackSend(
+                        channel: '#jenkins-integration',
+                        color: '#FF0000',
+                        message: ":x: Build failed for *${env.JOB_NAME}* #${env.BUILD_NUMBER}. Check Jenkins logs for details."
+                    )
+                } catch (err) {
+                    echo ":warning: Slack failure message skipped: ${err.message}"
+                }
+            }
         }
     }
 }
