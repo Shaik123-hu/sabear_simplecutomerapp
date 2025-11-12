@@ -1,9 +1,11 @@
 pipeline {
     agent any
+
     tools {
         // Must match names from "Manage Jenkins → Global Tool Configuration"
         maven 'maven'
     }
+
     environment {
         // Nexus configuration
         NEXUS_VERSION = 'nexus3'
@@ -11,33 +13,41 @@ pipeline {
         NEXUS_URL = '3.92.251.66:8081'
         NEXUS_REPOSITORY = 'nexus'
         NEXUS_CREDENTIAL_ID = 'nexus'
+
         // SonarQube configuration
-        SCANNER_HOME = tool 'sonar'
-        SONARQUBE_ENV = 'sonar'
-        // Git repository
+        SCANNER_HOME = tool 'sonar'  // Matches your Sonar Scanner installation name
+
+        // Git configuration
         GIT_URL = 'https://github.com/Shaik123-hu/sabear_simplecutomerapp.git'
         GIT_BRANCH = 'feature-1.1'
-        // Application info
+
+        // App info
         APP_VERSION = '3.0'
         APP_NAME = 'SimpleCustomerApp'
     }
+
     stages {
+
         stage('Clone Code') {
             steps {
                 git branch: "${GIT_BRANCH}", url: "${GIT_URL}"
                 echo ":white_check_mark: Repository cloned from ${GIT_BRANCH}"
             }
         }
+
         stage('Maven Build') {
             steps {
                 echo ":building_construction: Running Maven Build..."
                 sh 'mvn -Dmaven.test.failure.ignore=true clean install'
             }
         }
+
         stage('SonarQube Analysis') {
             steps {
                 echo ":mag: Starting SonarQube Code Analysis..."
-                withSonarQubeEnv("${SONARQUBE_ENV}") {
+
+                // Use Jenkins credentials to securely inject SonarQube token
+                withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
                     sh '''
                         ${SCANNER_HOME}/bin/sonar-scanner \
                           -Dsonar.projectKey=Ncodeit \
@@ -45,12 +55,15 @@ pipeline {
                           -Dsonar.projectVersion=${APP_VERSION} \
                           -Dsonar.sources=src \
                           -Dsonar.java.binaries=target \
-                          -Dsonar.host.url=http://44.204.248.233:9000
+                          -Dsonar.host.url=http://44.204.248.233:9000 \
+                          -Dsonar.login=$SONAR_TOKEN
                     '''
                 }
+
                 echo ":white_check_mark: SonarQube scan triggered successfully."
             }
         }
+
         stage('Publish to Nexus') {
             steps {
                 echo ":package: Uploading artifact to Nexus..."
@@ -74,20 +87,20 @@ pipeline {
                 echo ":white_check_mark: Artifact successfully published to Nexus"
             }
         }
+
         stage('Deploy to Tomcat') {
             steps {
                 echo ":rocket: Deploying WAR file to Tomcat..."
                 sh '''
                     WAR_FILE=$(ls target/*.war | head -n 1)
                     echo "Deploying $WAR_FILE to Tomcat..."
-                    # If your Tomcat manager requires login, use: curl -u tomcat:tomcat ...
-                    # If authentication is disabled (test setup), just use plain curl:
                     curl -T $WAR_FILE \
                          "http://54.145.245.39:8080/manager/text/deploy?path=/simplecustomerapp&update=true"
                 '''
                 echo ":white_check_mark: Deployment to Tomcat successful!"
             }
         }
+
         stage('Slack Notification') {
             steps {
                 echo ":speech_balloon: Slack Notification Stage"
@@ -105,6 +118,7 @@ pipeline {
             }
         }
     }
+
     post {
         failure {
             script {
